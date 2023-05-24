@@ -28,9 +28,9 @@ namespace RGLUnityPlugin
         public RGLMesh RglMesh;
         public Func<Matrix4x4> GetLocalToWorld;
         public GameObject RepresentedGO;
-        public int? SemanticCategoryId = null;
+        public int? RglEnitityId = null;
 
-        public IntPtr rglEntityPtr;
+        private IntPtr rglEntityPtr;
 
         public RGLObject(string identifier, RGLMesh rglMesh, Func<Matrix4x4> getLocalToWorld, GameObject representedGO)
         {
@@ -39,13 +39,14 @@ namespace RGLUnityPlugin
             GetLocalToWorld = getLocalToWorld;
             RepresentedGO = representedGO;
 
-            SemanticCategory sm = RepresentedGO.GetComponentInParent<SemanticCategory>();
-            if (sm != null)
-            {
-                SemanticCategoryId = sm.CategoryId;
-            }
-
             UploadToRGL();
+
+            SemanticCategory sc = RepresentedGO.GetComponentInParent<SemanticCategory>();
+            if (sc != null)
+            {
+                sc.onCategoryIdChange += SetRGLEntityId;
+                SetRGLEntityId(sc.CategoryId);
+            }
         }
 
         ~RGLObject()
@@ -108,12 +109,21 @@ namespace RGLUnityPlugin
                     if (rglEntityPtr != IntPtr.Zero) RGLNativeAPI.rgl_entity_destroy(rglEntityPtr);
                     throw;
                 }
+            }
+        }
 
-                if (SemanticCategoryId is int rglEntityId)
-                {
-                    RGLNativeAPI.CheckErr(
-                        RGLNativeAPI.rgl_entity_set_id(rglEntityPtr, rglEntityId));
-                }
+        protected void SetRGLEntityId(int entityId)
+        {
+            if (rglEntityPtr == IntPtr.Zero)
+            {
+                throw new RGLException($"Attempted to set id to entity '{Identifier}' that is not uploaded.");
+            }
+
+            RglEnitityId = entityId;
+            unsafe
+            {
+                RGLNativeAPI.CheckErr(
+                    RGLNativeAPI.rgl_entity_set_id(rglEntityPtr, entityId));
             }
         }
     }
